@@ -14,7 +14,7 @@ import scala.language.postfixOps
   */
 object Main {
 
-  val client = YFWSClient.fromConfig(ConfigFactory.load())
+  val client = AdministrationServiceClient.fromConfig(ConfigFactory.load())
 
   def main(args: Array[String]): Unit = {
     listClients

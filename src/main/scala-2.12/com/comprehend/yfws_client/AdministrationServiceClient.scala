@@ -3,10 +3,10 @@ package com.comprehend.yfws_client
 import com.hof.mi.web.service._
 import com.typesafe.config.Config
 
-class YFWSClient(service: AdministrationServiceInterface,
-                 username: String,
-                 password: String,
-                 dbPassword: String) {
+class AdministrationServiceClient(service: AdministrationServiceInterface,
+                                  username: String,
+                                  password: String,
+                                  dbPassword: String) {
 
   def call(function: String)(filter: AdministrationServiceRequest => AdministrationServiceRequest): AdministrationServiceResponse = {
     val req = new AdministrationServiceRequest
@@ -46,15 +46,15 @@ class YFWSClient(service: AdministrationServiceInterface,
 /**
   * https://wiki.yellowfinbi.com/display/USER73Plus/Administration+Service
   */
-object YFWSClient {
-  def fromConfig(conf: Config): YFWSClient = {
+object AdministrationServiceClient {
+  def fromConfig(conf: Config): AdministrationServiceClient = {
     val host = conf.getString("host")
     val port = conf.getString("port").toInt
     val useSSL = conf.getString("useSSL").toBoolean
     val username = conf.getString("username")
     val password = conf.getString("password")
     // dbpassword is required only for METADATASQLQUERY
-    val dbPassword = conf.getString("db_password").orElse("")
+    val dbPassword = conf.getString("db_password").orElse("").toString()
 
     val service = new AdministrationServiceServiceLocator(
       host,
@@ -63,6 +63,6 @@ object YFWSClient {
       useSSL
     ).getAdministrationService
 
-    new YFWSClient(service, username, password, dbPassword)
+    new AdministrationServiceClient(service, username, password, dbPassword)
   }
 }
