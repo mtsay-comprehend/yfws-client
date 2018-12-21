@@ -1,34 +1,44 @@
 package com.comprehend.yfws_client
 
-import java.io.File
+import java.io.{BufferedOutputStream, File, FileOutputStream}
 import java.nio.file.Files
 import java.util.Base64
 
-import com.hof.mi.web.service.{ContentResource, ImportOption}
+import com.hof.mi.web.service.{AdministrationServiceRequest, ContentResource, ImportOption, ReportBinaryObject}
 import com.typesafe.config.ConfigFactory
 
 import scala.language.postfixOps
 
+/**
+  * See more function names at https://wiki.yellowfinbi.com/display/USER73Plus/Administration+Service
+  */
 object Main {
-  implicit class NullCoalescer[T](val v: T) extends AnyVal {
-    def ??(defaultValue: T): T = { Option(v).getOrElse(defaultValue) }
-  }
 
   val client = YFWSClient.fromConfig(ConfigFactory.load())
 
-  val content1 = "0428.xml"
-  val content2 = "0504.xml"
-
   def main(args: Array[String]): Unit = {
-    moreCompareContent
+    listClients
+
+    //listGroups
+
+    // this will print available reports/views/....
+    //getContent
+
+    // this will export report metadata, this is not a content
+    //val contentResource = getContent("Subject Visit - Listing")
+    //exportContent(contentResource, "output.xml")
+
+    //moreCompareContent
   }
 
   def moreCompareContent: Unit = {
+    val content2 = "0504.xml"
+
     val oldContent = client.call("GETCONTENT") {
       identity
     } getContentResources
 
-    val xmlContent = Array(getContent(content2))
+    val xmlContent = Array(getContentFromFile(content2))
 
     val newContent = client.call("GETIMPORTCONTENT") { req =>
       req.setParameters(xmlContent)
@@ -74,19 +84,22 @@ object Main {
   }
 
   def importOldContent: Unit = {
+    val content1 = "0428.xml"
     client.call("IMPORTCONTENT") { req =>
-      req.setParameters(Array(getContent(content1)))
+      req.setParameters(Array(getContentFromFile(content1)))
       req
     }
   }
 
   def compareContent: Unit = {
+    val content2 = "0504.xml"
+
     val oldContent = client.call("GETCONTENT") {
       identity
     } getContentResources
 
     val newContent = client.call("GETIMPORTCONTENT") { req =>
-      req.setParameters(Array(getContent(content2)))
+      req.setParameters(Array(getContentFromFile(content2)))
       req
     } getContentResources
 
@@ -146,7 +159,7 @@ object Main {
         """.stripMargin)
   }
 
-  def getContent(filename: String): String = {
+  def getContentFromFile(filename: String): String = {
     new String(Base64.getEncoder.encode(Files.readAllBytes(new File(filename).toPath)))
   }
 
@@ -154,6 +167,46 @@ object Main {
     client.call("FLUSHCACHEDFILTERCACHE") { req =>
       req.setParameters(Array())
       req
+    }
+  }
+
+/**
+    * this method suppose to be used with getContent(String)
+    * @param contentResource
+    * @param filename
+    */
+  def exportContent(contentResource: ContentResource , filename: String): Unit = {
+    val response = client.runExport(contentResource)
+
+    val bos = new BufferedOutputStream(new FileOutputStream(filename))
+    response.getBinaryAttachments foreach { binary =>
+      bos.write(binary.getData)
+    }
+    bos.close()
+  }
+
+  def getContent(resourceName: String): ContentResource = {
+    val response = client.call("GETCONTENT") {
+      identity
+    }
+
+    response.getContentResources.filter(_.getResourceName == resourceName).head
+  }
+
+  def getContent: Unit = {
+    val response = client.call("GETCONTENT") {
+      identity
+    }
+
+    response.getContentResources foreach { resource =>
+      print(
+        s"""
+           |ResourceName:  ${resource.getResourceName}
+           |ResourceId:  ${resource.getResourceId}
+           |resourceUUID:  ${resource.getResourceUUID}
+           |resourceType: ${resource.getResourceType}
+         """.stripMargin
+      )
     }
   }
 
@@ -199,4 +252,9 @@ object Main {
          |WHERE internalreferenceid = '$groupId'
       """.stripMargin)
   }
+
+  implicit class NullCoalescer[T](val v: T) extends AnyVal {
+    def ??(defaultValue: T): T = { Option(v).getOrElse(defaultValue) }
+  }
+
 }
