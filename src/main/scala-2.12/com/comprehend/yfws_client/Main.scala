@@ -4,7 +4,7 @@ import java.io.{BufferedOutputStream, File, FileOutputStream}
 import java.nio.file.Files
 import java.util.Base64
 
-import com.hof.mi.web.service.{AdministrationServiceRequest, ContentResource, ImportOption, ReportBinaryObject}
+import com.hof.mi.web.service._
 import com.typesafe.config.ConfigFactory
 
 import scala.language.postfixOps
@@ -14,10 +14,14 @@ import scala.language.postfixOps
   */
 object Main {
 
-  val client = AdministrationServiceClient.fromConfig(ConfigFactory.load())
+  val configname = "application-local"
+  val adminClient = AdministrationServiceClient.fromConfig(ConfigFactory.load(configname))
+  val reportClient = ReportServiceClient.fromConfig(ConfigFactory.load(configname))
 
   def main(args: Array[String]): Unit = {
-    listClients
+    getChartsAndSafeCharts
+
+    //listClients
 
     //listGroups
 
@@ -31,16 +35,51 @@ object Main {
     //moreCompareContent
   }
 
+  def getChartsAndSafeCharts: Unit = {
+    val response = reportClient.call { request =>
+      request.setReportRequest("HTMLCHARTONLY")
+      request.setReportId(76251);
+      request.setObjectName("Subject Screening Summary");
+      request
+    }
+
+    println("Chart Size:" + response.getCharts.size)
+    printCharts(response)
+    saveCharts(response, "target/chart-from-yf")
+  }
+
+  def saveCharts(response: ReportServiceResponse, filename: String): Unit = {
+    response.getCharts foreach  { chart =>
+      val decoded = Base64.getMimeDecoder.decode(chart.getData)
+      val bos = new BufferedOutputStream(new FileOutputStream(filename+System.currentTimeMillis+".png"))
+      bos.write(decoded)
+      bos.close()
+    }
+  }
+
+  def printCharts(response: ReportServiceResponse): Unit = {
+    print(
+      s"""
+         |ReportId: ${response.getReportId}
+         |ReportUUID: ${response.getReportUUID}
+         |ReportName: ${response.getReportName}
+         |DrillCode: ${response.getDrillCode}
+         |Chart.size: ${response.getCharts.size}
+         |ReportStyle: ${response.getReportStyle.substring(0,100)}
+         |PreRunFilterString: ${response.getPreRunFilterString}
+        """.stripMargin)
+  }
+
   def moreCompareContent: Unit = {
     val content2 = "0504.xml"
 
-    val oldContent = client.call("GETCONTENT") {
+    val oldContent = adminClient.call("GETCONTENT") {
       identity
     } getContentResources
 
     val xmlContent = Array(getContentFromFile(content2))
 
-    val newContent = client.call("GETIMPORTCONTENT") { req =>
+    val newContent = adminClient.call("GETIMPORTCONTENT") { req =>
       req.setParameters(xmlContent)
       req
     } getContentResources
@@ -76,7 +115,7 @@ object Main {
       }
     }
 
-    val response = client.call("IMPORTCONTENT") { req =>
+    val response = adminClient.call("IMPORTCONTENT") { req =>
       req.setParameters(xmlContent)
       req.setImportOptions(importOptions)
       req
@@ -85,7 +124,7 @@ object Main {
 
   def importOldContent: Unit = {
     val content1 = "0428.xml"
-    client.call("IMPORTCONTENT") { req =>
+    adminClient.call("IMPORTCONTENT") { req =>
       req.setParameters(Array(getContentFromFile(content1)))
       req
     }
@@ -94,11 +133,11 @@ object Main {
   def compareContent: Unit = {
     val content2 = "0504.xml"
 
-    val oldContent = client.call("GETCONTENT") {
+    val oldContent = adminClient.call("GETCONTENT") {
       identity
     } getContentResources
 
-    val newContent = client.call("GETIMPORTCONTENT") { req =>
+    val newContent = adminClient.call("GETIMPORTCONTENT") { req =>
       req.setParameters(Array(getContentFromFile(content2)))
       req
     } getContentResources
@@ -164,7 +203,7 @@ object Main {
   }
 
   def flushCachedFilterCache: Unit = {
-    client.call("FLUSHCACHEDFILTERCACHE") { req =>
+    adminClient.call("FLUSHCACHEDFILTERCACHE") { req =>
       req.setParameters(Array())
       req
     }
@@ -176,7 +215,7 @@ object Main {
     * @param filename
     */
   def exportContent(contentResource: ContentResource , filename: String): Unit = {
-    val response = client.runExport(contentResource)
+    val response = adminClient.runExport(contentResource)
 
     val bos = new BufferedOutputStream(new FileOutputStream(filename))
     response.getBinaryAttachments foreach { binary =>
@@ -186,7 +225,7 @@ object Main {
   }
 
   def getContent(resourceName: String): ContentResource = {
-    val response = client.call("GETCONTENT") {
+    val response = adminClient.call("GETCONTENT") {
       identity
     }
 
@@ -194,7 +233,7 @@ object Main {
   }
 
   def getContent: Unit = {
-    val response = client.call("GETCONTENT") {
+    val response = adminClient.call("GETCONTENT") {
       identity
     }
 
@@ -211,7 +250,7 @@ object Main {
   }
 
   def listClients: Unit = {
-    val response = client.call("LISTCLIENTS") {
+    val response = adminClient.call("LISTCLIENTS") {
       identity
     }
 
@@ -227,7 +266,7 @@ object Main {
   }
 
   def listGroups(clientId: String): Unit = {
-    val response = client.call("LISTGROUPS") { req =>
+    val response = adminClient.call("LISTGROUPS") { req =>
       req.setOrgRef(clientId)
       req
     }
@@ -245,7 +284,7 @@ object Main {
   }
 
   def updateGroupName(groupId: String, groupName: String): Unit = {
-    client.runQuery(
+    adminClient.runQuery(
       s"""
          |UPDATE accessgroup
          |SET shortdescription = '$groupName'
