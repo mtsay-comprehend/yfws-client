@@ -1,4 +1,4 @@
-##Scala Client for Yellowfin Administrative Service
+## Scala Client for Yellowfin Administrative Service
 
 List of functions:
 https://wiki.yellowfinbi.com/display/USER73Plus/Administration+Service
