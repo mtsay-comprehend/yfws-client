@@ -19,7 +19,9 @@ object Main {
   val reportClient = ReportServiceClient.fromConfig(ConfigFactory.load(configname))
 
   def main(args: Array[String]): Unit = {
-    getChartsAndSafeCharts
+    //uuid2id("24808ae3-04ab-40ff-aa12-8025bc3ed27a")
+
+    getChartsAndSafeCharts(uuid2id("24808ae3-04ab-40ff-aa12-8025bc3ed27a"))
 
     //listClients
 
@@ -35,10 +37,24 @@ object Main {
     //moreCompareContent
   }
 
-  def getChartsAndSafeCharts: Unit = {
+  /**
+    * https://community.yellowfinbi.com/knowledge-base/article/new-web-services-that-are-not-documented-as-of-yet
+    * @param uuidValue UUID of report that could be taken from URL
+    * @return ID of report from YF DB
+    */
+  def uuid2id(uuidValue: String ): Int = {
+    val response = reportClient.call { request =>
+      request.setReportRequest("GETIDFORUUID")
+      request.setObjectName(uuidValue)
+      request
+    }
+    response.getReportId
+  }
+
+  def getChartsAndSafeCharts(id: Int): Unit = {
     val response = reportClient.call { request =>
       request.setReportRequest("HTMLCHARTONLY")
-      request.setReportId(76251);
+      request.setReportId(id);
       request.setObjectName("Subject Screening Summary");
       request
     }
@@ -51,7 +67,7 @@ object Main {
   def saveCharts(response: ReportServiceResponse, filename: String): Unit = {
     response.getCharts foreach  { chart =>
       val decoded = Base64.getMimeDecoder.decode(chart.getData)
-      val bos = new BufferedOutputStream(new FileOutputStream(filename+System.currentTimeMillis+".png"))
+      val bos = new BufferedOutputStream(new FileOutputStream(filename+response.getCharts.indexOf(chart)+".png"))
       bos.write(decoded)
       bos.close()
     }
@@ -65,8 +81,8 @@ object Main {
          |ReportName: ${response.getReportName}
          |DrillCode: ${response.getDrillCode}
          |Chart.size: ${response.getCharts.size}
-         |ReportStyle: ${response.getReportStyle.substring(0,100)}
-         |PreRunFilterString: ${response.getPreRunFilterString}
+         |ReportStyle: ${response.getReportStyle.substring(0,100)} ...
+         |PreRunFilterString: ${response.getPreRunFilterString.substring(0,100)} ...
         """.stripMargin)
   }
 
