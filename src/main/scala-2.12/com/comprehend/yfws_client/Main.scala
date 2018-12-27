@@ -21,7 +21,8 @@ object Main {
   def main(args: Array[String]): Unit = {
     //uuid2id("24808ae3-04ab-40ff-aa12-8025bc3ed27a")
 
-    getChartsAndSafeCharts(uuid2id("24808ae3-04ab-40ff-aa12-8025bc3ed27a"))
+    getHtmlAndSafe(uuid2id("24808ae3-04ab-40ff-aa12-8025bc3ed27a"))
+    //getHtmlAndSafe(uuid2id("0517de7f-37ea-4e80-9b7b-edc9670883bf"))
 
     //listClients
 
@@ -51,17 +52,25 @@ object Main {
     response.getReportId
   }
 
-  def getChartsAndSafeCharts(id: Int): Unit = {
+  def getHtmlAndSafe(id: Int): Unit = {
     val response = reportClient.call { request =>
-      request.setReportRequest("HTMLCHARTONLY")
+      request.setReportRequest("HTML")
       request.setReportId(id);
-      request.setObjectName("Subject Screening Summary");
       request
     }
 
-    println("Chart Size:" + response.getCharts.size)
-    printCharts(response)
+    printReportResponse(response)
+    val fileName = "target/data-from-yf.html"
+    saveBinaryData(response, fileName)
+    print("HTML content is saved to " + fileName)
     saveCharts(response, "target/chart-from-yf")
+  }
+
+  def saveBinaryData(response: ReportServiceResponse, fileName: String): Unit = {
+    val decoded = Base64.getMimeDecoder.decode(response.getBinaryData)
+    val bos = new BufferedOutputStream(new FileOutputStream(fileName))
+    bos.write(decoded)
+    bos.close()
   }
 
   def saveCharts(response: ReportServiceResponse, filename: String): Unit = {
@@ -73,12 +82,15 @@ object Main {
     }
   }
 
-  def printCharts(response: ReportServiceResponse): Unit = {
+  def printReportResponse(response: ReportServiceResponse): Unit = {
     print(
       s"""
          |ReportId: ${response.getReportId}
          |ReportUUID: ${response.getReportUUID}
          |ReportName: ${response.getReportName}
+         |ReportTemplate: ${response.getReportTemplate}
+         |FormatCode: ${response.getFormatCode}
+         |DataOutput: ${response.getDataOutput}
          |DrillCode: ${response.getDrillCode}
          |Chart.size: ${response.getCharts.size}
          |ReportStyle: ${response.getReportStyle.substring(0,100)} ...
